@@ -1,7 +1,6 @@
 
 import GeneralSearching from './component/SearchFromCondition/Page';
 import LPSearching from './component/SearchFromLP/Page';
-import npilogo from './img/npilogo.PNG'
 import personlogo from './img/person.png'
 import React from "react";
 import { Button,Input , Icon, Col,Row,message} from 'antd';

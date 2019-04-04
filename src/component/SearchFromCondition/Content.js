@@ -75,6 +75,7 @@ class SearchingContent extends Component {
             data : body,
             url : urls,
         }).then(res => {
+            console.log(res.data)
             this.setState({data: res.data})
         });
       }

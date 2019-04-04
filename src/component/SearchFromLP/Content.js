@@ -1,6 +1,6 @@
 import React, { Component } from 'react'
 import axios from 'axios'
-import ReactMapboxGl, { Layer, Feature ,Source  } from "react-mapbox-gl";
+import ReactMapboxGl, { Layer, Feature ,Source ,GeoJSONLayer } from "react-mapbox-gl";
 import { Menu, Dropdown, Icon , Button ,Slider, InputNumber, Col, Row, Card, Table, Input} from 'antd';
 import {verifymodelService, modelList, createmodelService} from '../../data/DataService';
 import Loader from 'react-loader-spinner'
@@ -16,8 +16,19 @@ class TrackingContent extends Component{
         this.state = {
             LP:'',
             data: '',
+            path: [],
+            source : {
+              "type": "geojson",
+              "data": {
+                  "type": "Feature",
+                  "properties": {},
+                  "geometry": {
+                      "type": "LineString",
+                      "coordinates": []
+                  }
+              }
+            },
         };
-        this.setLoader=this.setLoader.bind(this);
         this.submitSearch = this.submitSearch.bind(this)
     }
     onChangeLP = (e) => {
@@ -28,16 +39,59 @@ class TrackingContent extends Component{
         // console.log('licensePlate>>>>',this.state.LP)
       }
 
-    setLoader(loadStatus){
-        this.setState({ loader : loadStatus })
+
+    // componentDidUpdate(prevProps, prevState){
+    //   console.log('prevState',prevState)
+    //   console.log('thisState',this.state)
+    //   if(this.state.path !== prevState.path){
+    //     this.setState({
+    //       source : {
+    //         "type": "geojson",
+    //         "data": {
+    //             "type": "Feature",
+    //             "properties": {},
+    //             "geometry": {
+    //                 "type": "LineString",
+    //                 "coordinates": [this.state.path]
+    //             }
+    //         }
+    //       }
+    //     })
+    //     console.log('source',this.state.source)
+    //   }
+    // }
+
+    componentWillUpdate(nextProps, nextState) {
+      const { map, path } = nextState;
+      if (map) {
+        console.log('pathInWillUpdate',path)
+        //map.getSource('STEST').setData(path);
+      }
     }
 
-    componentWillMount(){
-        modelList(this.setList);
-        
+    onStyleLoad = (map, e) => {
+      this.setState( {map} );
+      console.log('map',map)
+    }
+
+    loadSource(e){
+      console.log('eOnload',e)
+      this.setState({
+        source : {
+          "type": "geojson",
+          "data": {
+              "type": "Feature",
+              "properties": {},
+              "geometry": {
+                  "type": "LineString",
+                  "coordinates": this.state.path
+              }
+          }
+        } 
+      })
     }
     
-    submitSearch(){
+    async submitSearch(){
         const serviceurl='http://localhost:5000'
         const urls =serviceurl + '/search'
         let query = {} 
@@ -49,7 +103,7 @@ class TrackingContent extends Component{
         
         const body = JSON.stringify(query)
         console.log(body)
-        axios({
+        await axios({
             method : 'post',
             headers : {
                 'Access-Control-Allow-Origin' : '*',
@@ -58,34 +112,52 @@ class TrackingContent extends Component{
             data : body,
             url : urls,
         }).then(res => {
-            this.setState({data: res.data})
+          console.log(res.data)
+          let route_data = [];
+          for(let i = 0; i < res.data.length; i++){
+            // console.log([res.data[i].lng, res.data[i].lat])
+            route_data.push([res.data[i].lng, res.data[i].lat]);
+          }
+          console.log("route_data>>",route_data)
+          this.setState({
+            path : route_data,
+            data: res.data,
+            source: {
+              "type": "geojson",
+              "data": {
+                  "type": "Feature",
+                  "properties": {},
+                  "geometry": {
+                      "type": "LineString",
+                      "coordinates": route_data
+                  }
+              }
+            }
+            
+          })
         });
       }
     render(){
-        const source = {
-            "type": "geojson",
-            "data": {
-                "type": "Feature",
-                "properties": {},
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": [
-                        [-122.48369693756104, 37.83381888486939],
-                        [-122.48348236083984, 37.83317489144141],
-                        [-122.48339653015138, 37.83270036637107],
-                        [-122.48356819152832, 37.832056363179625],
-                        [-122.48404026031496, 37.83114119107971],
-                        [-122.48404026031496, 37.83049717427869],
-                        [-122.48348236083984, 37.829920943955045],
-                        [-122.48356819152832, 37.82954808664175],
-                        [-122.48507022857666, 37.82944639795659],
-                        [-122.48610019683838, 37.82880236636284]
-      
-                    ]
-                }
-            }
+      console.log('path',this.state.path)
+      console.log('source reder',this.state.source)
+        let source = {
+          "type": "geojson",
+          "data": {
+              "type": "Feature",
+              "properties": {},
+              "geometry": {
+                  "type": "LineString",
+                  "coordinates": [
+                    [100.410129, 13.640301999999998],
+                    [100.574999, 13.839751000000001],
+                    [100.474152, 13.729420999999999],
+                    [100.530919, 13.80625],
+                    [100.46935, 13.754860999999998]
+                  ]
+              }
+          }
         }
-
+        
         const columns = [{
             title: 'ป้ายทะเบียน',
             dataIndex: 'licensePlates',
@@ -122,7 +194,6 @@ class TrackingContent extends Component{
         //     )
         // }
         // else if(this.state.loader === 'false'){
-
         return(
             <div>
                 <Card style={{textAlign:'center',background:'#fde869'}}>
@@ -153,8 +224,12 @@ class TrackingContent extends Component{
                 containerStyle={{
                     height: "100vh",
                     width: "100vw",
-                }}>
-                <Source id="STEST" tileJsonSource={source}/>
+                }}
+                onStyleLoad={this.onStyleLoad}
+                >
+                <Source id="STEST" 
+                geoJsonSource={this.state.source}
+                />
                     <Layer
                     sourceId = "STEST"
                     type="line" 
@@ -168,7 +243,6 @@ class TrackingContent extends Component{
                         "line-width": 8
                     }}
                     >
-                    {/* <Feature coordinates={[-0.481747846041145, 51.3233379650232]}/> */}
                     </Layer>
                 </Map>
             </div>
